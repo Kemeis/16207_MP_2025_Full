@@ -20,7 +20,7 @@
     .menu-panel {
       position: absolute;
       z-index: 20;
-      background: rgba(255, 255, 255, 0.96);
+      background: rgba(255,255,255,0.95);
       border-radius: 10px;
       padding: 10px;
       min-width: 240px;
@@ -28,311 +28,165 @@
       display: none;
     }
 
-    .menu-panel h4 {
-      margin: 0 0 8px 0;
-      font-size: 14px;
-    }
-
     .menu-panel button {
       display: block;
       width: 100%;
       margin: 6px 0;
-      padding: 10px 12px;
+      padding: 10px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       background: #f2f2f2;
-      text-align: left;
-      font-size: 14px;
     }
 
     .menu-panel button:hover {
       background: #ddd;
     }
-
-    .menu-close {
-      background: #eaeaea !important;
-      font-weight: bold;
-    }
-
-    #debugBox {
-      position: absolute;
-      left: 20px;
-      top: 20px;
-      z-index: 20;
-      background: rgba(0,0,0,0.65);
-      color: white;
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 13px;
-      line-height: 1.4;
-      max-width: 340px;
-    }
   </style>
 </head>
 <body>
-  <div id="panorama"></div>
 
-  <div id="menuPanel" class="menu-panel">
-    <h4 id="menuTitle">Navigation</h4>
-    <div id="menuButtons"></div>
-    <button class="menu-close" onclick="closeMenu()">Close</button>
-  </div>
+<div id="panorama"></div>
+<div id="menuPanel" class="menu-panel"></div>
 
-  <div id="debugBox">
-    <b>Debug mode enabled</b><br>
-    Click panorama and check Console (F12).<br>
-    It prints yaw/pitch and XYZ.
-  </div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.105.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/pchen66/panolens.js@0.10.2/build/panolens.min.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.105.2/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/pchen66/panolens.js@0.10.2/build/panolens.min.js"></script>
+<script>
+const panoDown1 = new PANOLENS.ImagePanorama('test.jpeg');
+const panoDown2 = new PANOLENS.ImagePanorama('cc.jpeg');
+const panoUp = new PANOLENS.ImagePanorama('mewo1.jpeg');
+const panoLaundry = new PANOLENS.ImagePanorama('paj1.jpeg');
 
-  <script>
-    const panoDown1 = new PANOLENS.ImagePanorama('test.jpeg');
-    const panoDown2 = new PANOLENS.ImagePanorama('cc.jpeg');
-    const panoUp = new PANOLENS.ImagePanorama('mewo1.jpeg');
-    const panoLaundry = new PANOLENS.ImagePanorama('paj1.jpeg');
+const viewer = new PANOLENS.Viewer({
+  container: document.getElementById('panorama'),
+  controlBar: false,
+  autoRotate: false,
+  output: 'console'
+});
 
-    const viewer = new PANOLENS.Viewer({
-      container: document.querySelector('#panorama'),
-      autoRotate: false,
-      controlBar: false,
-      output: 'console'
-    });
+viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
+viewer.setPanorama(panoDown1);
 
-    viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
-    viewer.setPanorama(panoDown1);
+// ===== KONWERSJA STOPNI NA POZYCJĘ =====
+function degToRad(d){ return d * Math.PI/180; }
 
-    const menuPanel = document.getElementById('menuPanel');
-    const menuButtons = document.getElementById('menuButtons');
-    const menuTitle = document.getElementById('menuTitle');
+function pos(yaw, pitch, r=5000){
+  const yR = degToRad(yaw);
+  const pR = degToRad(pitch);
+  return {
+    x: r * Math.sin(yR) * Math.cos(pR),
+    y: r * Math.sin(pR),
+    z: -r * Math.cos(yR) * Math.cos(pR)
+  };
+}
 
-    function openMenu(title, items, event) {
-      menuTitle.textContent = title;
-      menuButtons.innerHTML = '';
+// ===== HOTSPOT GO TO =====
+function spot(panoFrom, panoTo, label, yaw, pitch){
+  const s = new PANOLENS.Infospot(350, PANOLENS.DataImage.Info);
+  const p = pos(yaw, pitch);
+  s.position.set(p.x, p.y, p.z);
+  s.addHoverText(label);
 
-      items.forEach(item => {
-        const btn = document.createElement('button');
-        btn.textContent = item.label;
-        btn.onclick = () => {
-          viewer.setPanorama(item.target);
-          closeMenu();
-        };
-        menuButtons.appendChild(btn);
-      });
+  s.addEventListener('click', ()=>{
+    viewer.setPanorama(panoTo);
 
-      // show menu near click if possible
-      let x = window.innerWidth / 2;
-      let y = window.innerHeight / 2;
-
-      if (event && event.mouseEvent) {
-        x = event.mouseEvent.clientX + 16;
-        y = event.mouseEvent.clientY + 16;
-      }
-
-      // keep menu inside screen
-      const menuWidth = 260;
-      const menuHeight = 180;
-      if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
-      if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
-
-      menuPanel.style.left = x + 'px';
-      menuPanel.style.top = y + 'px';
-      menuPanel.style.display = 'block';
+    // usuwa tekst po kliknięciu
+    if (s.hoverElement) {
+      s.hoverElement.style.display = 'none';
     }
 
-    function closeMenu() {
-      menuPanel.style.display = 'none';
+    closeMenu();
+  });
+
+  panoFrom.add(s);
+}
+
+// ===== MENU =====
+function menu(panoFrom, items, yaw, pitch){
+  const s = new PANOLENS.Infospot(380, PANOLENS.DataImage.Arrow);
+  const p = pos(yaw, pitch);
+  s.position.set(p.x, p.y, p.z);
+
+  s.scale.x = -1; // flip ikony
+
+  // kolor + glow (żeby było widać na białym)
+  setTimeout(()=>{
+    const img = s.element?.querySelector('img');
+    if(img){
+      img.style.filter =
+        'drop-shadow(0 0 6px white) ' +
+        'drop-shadow(0 0 10px hotpink) ' +
+        'hue-rotate(300deg) saturate(3)';
     }
+  }, 100);
 
-    function degToRad(deg) {
-      return deg * Math.PI / 180;
-    }
+  s.addEventListener('click', (e)=>{
+    openMenu(items, e);
+  });
 
-    // yaw: left/right, pitch: up/down
-    // yaw 0 = front, -90 = left, +90 = right
-    // pitch positive = up, negative = down
-    function positionFromAngles(yawDeg, pitchDeg, radius = 5000) {
-      const yaw = degToRad(yawDeg);
-      const pitch = degToRad(pitchDeg);
+  panoFrom.add(s);
+}
 
-      const x = radius * Math.sin(yaw) * Math.cos(pitch);
-      const y = radius * Math.sin(pitch);
-      const z = -radius * Math.cos(yaw) * Math.cos(pitch);
+// ===== PANEL MENU =====
+function openMenu(items, e){
+  const panel = document.getElementById('menuPanel');
+  panel.innerHTML = '';
 
-      return { x, y, z };
-    }
+  items.forEach(i=>{
+    const b = document.createElement('button');
+    b.textContent = i.label;
 
-    function makeSpot(size = 350, img = PANOLENS.DataImage.Info) {
-      return new PANOLENS.Infospot(size, img);
-    }
+    b.onclick = ()=>{
+      viewer.setPanorama(i.target);
+      closeMenu();
+    };
 
-    function colorizeSpot(spot, color = '#ff2ea6') {
-      const img = spot.element && spot.element.querySelector('img');
-      if (img) {
-        img.style.filter =
-          'drop-shadow(0 0 6px rgba(255,255,255,0.95)) ' +
-          'drop-shadow(0 0 10px rgba(255,46,166,0.95)) ' +
-          'hue-rotate(290deg) saturate(3) brightness(1.25)';
-      }
-    }
+    panel.appendChild(b);
+  });
 
-    function addGotoSpotByAngles(panoFrom, panoTo, label, yawDeg, pitchDeg) {
-      const spot = makeSpot(350, PANOLENS.DataImage.Info);
-      const pos = positionFromAngles(yawDeg, pitchDeg);
-      spot.position.set(pos.x, pos.y, pos.z);
-      spot.addHoverText(label);
+  // pojawia się przy kliknięciu
+  panel.style.left = (e.mouseEvent.clientX + 10) + 'px';
+  panel.style.top = (e.mouseEvent.clientY + 10) + 'px';
+  panel.style.display = 'block';
+}
 
-      spot.addEventListener('click', () => {
-        // remove hover text feeling after click by clearing it
-        if (spot.hoverElement) {
-          spot.hoverElement.style.display = 'none';
-        }
-        viewer.setPanorama(panoTo);
-        closeMenu();
-      });
+function closeMenu(){
+  document.getElementById('menuPanel').style.display = 'none';
+}
 
-      panoFrom.add(spot);
-      return spot;
-    }
+// ===== HOTSPOTY =====
 
-    function addMenuSpotByAngles(panoFrom, title, items, yawDeg, pitchDeg) {
-      const spot = makeSpot(380, PANOLENS.DataImage.Arrow);
-      const pos = positionFromAngles(yawDeg, pitchDeg);
-      spot.position.set(pos.x, pos.y, pos.z);
+// test -> cc
+spot(panoDown1, panoDown2, 'Go there', 90, -45);
 
-      // horizontal flip
-      spot.scale.x = -1;
+// cc -> test
+spot(panoDown2, panoDown1, 'Go there', 90, -45);
 
-      panoFrom.add(spot);
+// menu downstairs
+menu(panoDown1, [
+  {label:'Go to upstairs bathroom', target:panoUp},
+  {label:'Go to laundry room', target:panoLaundry}
+], 20, 0);
 
-      // color after add
-      setTimeout(() => colorizeSpot(spot), 100);
+menu(panoDown2, [
+  {label:'Go to upstairs bathroom', target:panoUp},
+  {label:'Go to laundry room', target:panoLaundry}
+], 20, 0);
 
-      spot.addEventListener('click', (event) => {
-        openMenu(title, items, event);
-      });
+// upstairs
+menu(panoUp, [
+  {label:'Go to downstairs bathroom', target:panoDown1},
+  {label:'Go to laundry room', target:panoLaundry}
+], -45, 0);
 
-      return spot;
-    }
+// laundry
+menu(panoLaundry, [
+  {label:'Go to upstairs bathroom', target:panoUp},
+  {label:'Go to downstairs bathroom', target:panoDown1}
+], -60, 0);
 
-    // ========= DOWNSTAIRS BATHROOM LOGIC =========
-    // Based on your instructions:
-    // menu: 20 left
-    // go to: 90 left, 60 down
+</script>
 
-    // downstairs test -> cc
-    addGotoSpotByAngles(
-      panoDown1,
-      panoDown2,
-      'Go there',
-      -90,
-      -60
-    );
-
-    // downstairs cc -> test
-    addGotoSpotByAngles(
-      panoDown2,
-      panoDown1,
-      'Go there',
-      -90,
-      -60
-    );
-
-    // downstairs menu in test
-    addMenuSpotByAngles(
-      panoDown1,
-      'Downstairs bathroom menu',
-      [
-        { label: 'Go to upstairs bathroom', target: panoUp },
-        { label: 'Go to laundry room', target: panoLaundry }
-      ],
-      -20,
-      0
-    );
-
-    // downstairs menu in cc
-    addMenuSpotByAngles(
-      panoDown2,
-      'Downstairs bathroom menu',
-      [
-        { label: 'Go to upstairs bathroom', target: panoUp },
-        { label: 'Go to laundry room', target: panoLaundry }
-      ],
-      -20,
-      0
-    );
-
-    // upstairs bathroom menu:
-    // 45 degrees right
-    addMenuSpotByAngles(
-      panoUp,
-      'Upstairs bathroom menu',
-      [
-        { label: 'Go to downstairs bathroom', target: panoDown1 },
-        { label: 'Go to laundry room', target: panoLaundry }
-      ],
-      45,
-      0
-    );
-
-    // laundry room menu:
-    // 60 degrees right
-    addMenuSpotByAngles(
-      panoLaundry,
-      'Laundry room menu',
-      [
-        { label: 'Go to upstairs bathroom', target: panoUp },
-        { label: 'Go to downstairs bathroom', target: panoDown1 }
-      ],
-      60,
-      0
-    );
-
-    // ========= DEBUG =========
-    function panoramaName(pano) {
-      if (pano === panoDown1) return 'test.jpeg';
-      if (pano === panoDown2) return 'cc.jpeg';
-      if (pano === panoUp) return 'mewo1.jpeg';
-      if (pano === panoLaundry) return 'paj1.jpeg';
-      return 'unknown';
-    }
-
-    function xyzToYawPitch(x, y, z) {
-      const radius = Math.sqrt(x*x + y*y + z*z);
-      const yaw = Math.atan2(x, -z) * 180 / Math.PI;
-      const pitch = Math.asin(y / radius) * 180 / Math.PI;
-      return {
-        yaw: Math.round(yaw),
-        pitch: Math.round(pitch)
-      };
-    }
-
-    [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
-      pano.addEventListener('click', function(event) {
-        if (!event.intersects || !event.intersects.length) return;
-
-        const point = event.intersects[0].point;
-        const x = Math.round(point.x);
-        const y = Math.round(point.y);
-        const z = Math.round(point.z);
-
-        const ang = xyzToYawPitch(point.x, point.y, point.z);
-
-        console.log('----------------------------------');
-        console.log('Panorama:', panoramaName(pano));
-        console.log(`XYZ: ${x}, ${y}, ${z}`);
-        console.log(`Yaw/Pitch: ${ang.yaw}°, ${ang.pitch}°`);
-        console.log(`spot.position.set(${x}, ${y}, ${z});`);
-        console.log(`// or use angles: yaw ${ang.yaw}, pitch ${ang.pitch}`);
-        console.log('----------------------------------');
-      });
-    });
-
-    window.viewer = viewer;
-    window.closeMenu = closeMenu;
-    window.openMenu = openMenu;
-  </script>
 </body>
 </html>
