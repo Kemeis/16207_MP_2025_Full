@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Multi Panorama Project</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    #panorama {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+    }
+
+    .menu-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 20;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 10px;
+      min-width: 220px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      display: none;
+    }
+
+    .menu-panel h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+
+    .menu-panel button {
+      display: block;
+      width: 100%;
+      margin: 6px 0;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #f2f2f2;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .menu-panel button:hover {
+      background: #ddd;
+    }
+
+    .menu-close {
+      background: #eaeaea !important;
+      font-weight: bold;
+    }
+
+    #debugBox {
+      position: absolute;
+      left: 20px;
+      top: 20px;
+      z-index: 20;
+      background: rgba(0,0,0,0.65);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      max-width: 320px;
+    }
+  </style>
+</head>
+<body>
+  <div id="panorama"></div>
+
+  <div id="menuPanel" class="menu-panel">
+    <h4 id="menuTitle">Navigation</h4>
+    <div id="menuButtons"></div>
+    <button class="menu-close" onclick="closeMenu()">Close</button>
+  </div>
+
+  <div id="debugBox">
+    <b>Debug mode enabled</b><br>
+    Klikaj w panoramę i sprawdzaj Console (F12).<br>
+    Tam dostaniesz gotowy <code>position.set(x,y,z)</code>.
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.105.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/pchen66/panolens.js@0.10.2/build/panolens.min.js"></script>
+
+  <script>
+    // ===== PANORAMAS =====
+    const panoDown1 = new PANOLENS.ImagePanorama('test.jpeg');
+    const panoDown2 = new PANOLENS.ImagePanorama('cc.jpeg');
+    const panoUp = new PANOLENS.ImagePanorama('mewo1.jpeg');
+    const panoLaundry = new PANOLENS.ImagePanorama('paj1.jpeg');
+
+    let currentPanorama = panoDown1;
+
+    const viewer = new PANOLENS.Viewer({
+      container: document.querySelector('#panorama'),
+      autoRotate: false,
+      controlBar: false,
+      output: 'console'
+    });
+
+    viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
+    viewer.setPanorama(panoDown1);
+
+    // ===== MENU PANEL =====
+    const menuPanel = document.getElementById('menuPanel');
+    const menuButtons = document.getElementById('menuButtons');
+    const menuTitle = document.getElementById('menuTitle');
+
+    function openMenu(title, items) {
+      menuTitle.textContent = title;
+      menuButtons.innerHTML = '';
+
+      items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.textContent = item.label;
+        btn.onclick = () => {
+          viewer.setPanorama(item.target);
+          closeMenu();
+        };
+        menuButtons.appendChild(btn);
+      });
+
+      menuPanel.style.display = 'block';
+    }
+
+    function closeMenu() {
+      menuPanel.style.display = 'none';
+    }
+
+    // ===== HELPERS =====
+    function makeSpot(size = 350, img = PANOLENS.DataImage.Info) {
+      return new PANOLENS.Infospot(size, img);
+    }
+
+    function addGotoSpot(panoFrom, panoTo, label, x, y, z) {
+      const spot = makeSpot(350, PANOLENS.DataImage.Info);
+      spot.position.set(x, y, z);
+      spot.addHoverText(label);
+      spot.addEventListener('click', () => {
+        viewer.setPanorama(panoTo);
+        closeMenu();
+      });
+      panoFrom.add(spot);
+      return spot;
+    }
+
+    function addMenuSpot(panoFrom, title, items, x, y, z) {
+      const spot = makeSpot(350, PANOLENS.DataImage.Arrow);
+      spot.position.set(x, y, z);
+
+      // poziome odbicie ikony
+      spot.scale.x = -1;
+
+      spot.addHoverText('Open menu');
+      spot.addEventListener('click', () => {
+        openMenu(title, items);
+      });
+
+      panoFrom.add(spot);
+      return spot;
+    }
+
+    // ===== TRACK CURRENT PANORAMA =====
+    [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
+      pano.addEventListener('enter-fade-start', () => {
+        currentPanorama = pano;
+        closeMenu();
+        console.log('Current panorama:',
+          pano === panoDown1 ? 'test.jpeg' :
+          pano === panoDown2 ? 'cc.jpeg' :
+          pano === panoUp ? 'mewo1.jpeg' :
+          pano === panoLaundry ? 'paj1.jpeg' : 'unknown'
+        );
+      });
+    });
+
+    // ===== HOTSPOTS =====
+
+    // test.jpeg -> cc.jpeg
+    addGotoSpot(
+      panoDown1,
+      panoDown2,
+      'Go there',
+      900, -350, -4800
+    );
+
+    // cc.jpeg -> test.jpeg
+    addGotoSpot(
+      panoDown2,
+      panoDown1,
+      'Go there',
+      -700, -250, -4800
+    );
+
+    // menu in test.jpeg
+    addMenuSpot(
+      panoDown1,
+      'Downstairs bathroom menu',
+      [
+        { label: 'Go to upstairs bathroom', target: panoUp },
+        { label: 'Go to laundry room', target: panoLaundry }
+      ],
+      -2500, -200, -3800
+    );
+
+    // menu in cc.jpeg
+    addMenuSpot(
+      panoDown2,
+      'Downstairs bathroom menu',
+      [
+        { label: 'Go to upstairs bathroom', target: panoUp },
+        { label: 'Go to laundry room', target: panoLaundry }
+      ],
+      2500, -200, -3800
+    );
+
+    // menu in mewo1.jpeg
+    addMenuSpot(
+      panoUp,
+      'Upstairs bathroom menu',
+      [
+        { label: 'Go to downstairs bathroom', target: panoDown1 },
+        { label: 'Go to laundry room', target: panoLaundry }
+      ],
+      -2200, -200, -4200
+    );
+
+    // menu in paj1.jpeg
+    addMenuSpot(
+      panoLaundry,
+      'Laundry room menu',
+      [
+        { label: 'Go to upstairs bathroom', target: panoUp },
+        { label: 'Go to downstairs bathroom', target: panoDown1 }
+      ],
+      -2200, -200, -4200
+    );
+
+    // ===== DEBUG TOOL =====
+    function panoramaName(pano) {
+      if (pano === panoDown1) return 'test.jpeg';
+      if (pano === panoDown2) return 'cc.jpeg';
+      if (pano === panoUp) return 'mewo1.jpeg';
+      if (pano === panoLaundry) return 'paj1.jpeg';
+      return 'unknown';
+    }
+
+    // Klikanie w panoramę -> podpowiedź do hotspota
+    [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
+      pano.addEventListener('click', function(event) {
+        if (!event.intersects || !event.intersects.length) return;
+
+        const point = event.intersects[0].point;
+        const x = Math.round(point.x);
+        const y = Math.round(point.y);
+        const z = Math.round(point.z);
+
+        console.log('----------------------------------');
+        console.log('Panorama:', panoramaName(pano));
+        console.log(`spot.position.set(${x}, ${y}, ${z});`);
+        console.log(`x=${x}, y=${y}, z=${z}`);
+        console.log('----------------------------------');
+      });
+    });
+
+    // Pomocniczo do ręcznego testowania w konsoli
+    window.viewer = viewer;
+    window.panoDown1 = panoDown1;
+    window.panoDown2 = panoDown2;
+    window.panoUp = panoUp;
+    window.panoLaundry = panoLaundry;
+    window.openMenu = openMenu;
+    window.closeMenu = closeMenu;
+  </script>
+</body>
+</html>
