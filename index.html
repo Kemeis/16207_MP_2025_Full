@@ -2,45 +2,110 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8" />
-  <title>Multi Panorama Project</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>16207_MP_2025</title>
   <style>
     html, body {
       margin: 0;
       height: 100%;
       overflow: hidden;
       font-family: sans-serif;
+      background: #111;
     }
 
     #panorama {
       width: 100%;
       height: 100%;
       position: absolute;
+      inset: 0;
     }
 
     .menu-panel {
       position: absolute;
-      z-index: 20;
-      background: rgba(255,255,255,0.95);
-      border-radius: 10px;
+      z-index: 30;
+      background: rgba(242, 242, 242, 0.97);
+      border-radius: 12px;
       padding: 10px;
-      min-width: 240px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      min-width: 250px;
+      max-width: calc(100vw - 24px);
+      box-shadow: 0 6px 22px rgba(0,0,0,0.28);
       display: none;
+      color: #333;
+    }
+
+    .menu-panel button,
+    .hamburger-btn {
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #e7e7e7;
+      color: #333;
+      font-size: 14px;
     }
 
     .menu-panel button {
       display: block;
       width: 100%;
       margin: 6px 0;
-      padding: 10px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #f2f2f2;
+      padding: 11px 12px;
+      text-align: left;
     }
 
-    .menu-panel button:hover {
-      background: #ddd;
+    .menu-panel button:hover,
+    .hamburger-btn:hover {
+      background: #d7d7d7;
+    }
+
+    .hamburger-wrap {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 35;
+    }
+
+    .hamburger-btn {
+      width: 56px;
+      height: 56px;
+      font-size: 24px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+      background: rgba(242, 242, 242, 0.96);
+    }
+
+    .debug-box {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      z-index: 35;
+      background: rgba(0,0,0,0.65);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.35;
+      max-width: 320px;
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .menu-panel {
+        right: 12px !important;
+        left: 12px !important;
+        bottom: 84px !important;
+        top: auto !important;
+        min-width: auto;
+        width: auto;
+      }
+
+      .menu-panel button {
+        font-size: 16px;
+        padding: 13px 14px;
+      }
+
+      .hamburger-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 26px;
+      }
     }
   </style>
 </head>
@@ -49,143 +114,352 @@
 <div id="panorama"></div>
 <div id="menuPanel" class="menu-panel"></div>
 
+<div class="hamburger-wrap">
+  <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu">☰</button>
+</div>
+
+<div class="debug-box" id="debugBox">
+  Debug mode enabled. Click panorama and check Console (F12).
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.105.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/pchen66/panolens.js@0.10.2/build/panolens.min.js"></script>
 
 <script>
-const panoDown1 = new PANOLENS.ImagePanorama('test.jpeg');
-const panoDown2 = new PANOLENS.ImagePanorama('cc.jpeg');
-const panoUp = new PANOLENS.ImagePanorama('mewo1.jpeg');
-const panoLaundry = new PANOLENS.ImagePanorama('paj1.jpeg');
+  const panoDown1 = new PANOLENS.ImagePanorama('test.jpeg');
+  const panoDown2 = new PANOLENS.ImagePanorama('cc.jpeg');
+  const panoUp = new PANOLENS.ImagePanorama('mewo1.jpeg');
+  const panoLaundry = new PANOLENS.ImagePanorama('paj1.jpeg');
 
-const viewer = new PANOLENS.Viewer({
-  container: document.getElementById('panorama'),
-  controlBar: false,
-  autoRotate: false,
-  output: 'console'
-});
-
-viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
-viewer.setPanorama(panoDown1);
-
-// ===== KONWERSJA STOPNI NA POZYCJĘ =====
-function degToRad(d){ return d * Math.PI/180; }
-
-function pos(yaw, pitch, r=5000){
-  const yR = degToRad(yaw);
-  const pR = degToRad(pitch);
-  return {
-    x: r * Math.sin(yR) * Math.cos(pR),
-    y: r * Math.sin(pR),
-    z: -r * Math.cos(yR) * Math.cos(pR)
+  const panoKeys = {
+    down1: panoDown1,
+    down2: panoDown2,
+    up: panoUp,
+    laundry: panoLaundry
   };
-}
 
-// ===== HOTSPOT GO TO =====
-function spot(panoFrom, panoTo, label, yaw, pitch){
-  const s = new PANOLENS.Infospot(350, PANOLENS.DataImage.Info);
-  const p = pos(yaw, pitch);
-  s.position.set(p.x, p.y, p.z);
-  s.addHoverText(label);
+  const viewer = new PANOLENS.Viewer({
+    container: document.getElementById('panorama'),
+    controlBar: false,
+    autoRotate: false,
+    output: 'console'
+  });
 
-  s.addEventListener('click', ()=>{
-    viewer.setPanorama(panoTo);
+  viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
 
-    // usuwa tekst po kliknięciu
-    if (s.hoverElement) {
-      s.hoverElement.style.display = 'none';
-    }
+  let currentPanorama = panoDown1;
+  let hotspotsVisible = true;
+  const allHotspots = [];
 
+  const floorPlanMap = new Map([
+    [panoDown1, '16207_MP_2025_VASKE_A3V18.pdf'],
+    [panoDown2, '16207_MP_2025_VASKE_A3V18.pdf'],
+    [panoLaundry, '16207_MP_2025_VASKE_A3V18.pdf'],
+    [panoUp, '16207_MP_2025_SMALL_A4V6.pdf']
+  ]);
+
+  const matterportMap = new Map([
+    [panoDown1, 'https://my.matterport.com/show/?m=jFZUjuYMpY9&ss=2&sr=-.51,.53'],
+    [panoDown2, 'https://my.matterport.com/show/?m=jFZUjuYMpY9&ss=1&sr=-2.06,.42'],
+    [panoLaundry, 'https://my.matterport.com/show/?m=jFZUjuYMpY9&ss=12&sr=-.6,.45'],
+    [panoUp, 'https://my.matterport.com/show/?m=jFZUjuYMpY9&ss=12&sr=-.6,.45']
+  ]);
+
+  function panoramaName(pano) {
+    if (pano === panoDown1) return 'test.jpeg';
+    if (pano === panoDown2) return 'cc.jpeg';
+    if (pano === panoUp) return 'mewo1.jpeg';
+    if (pano === panoLaundry) return 'paj1.jpeg';
+    return 'unknown';
+  }
+
+  function panoramaKey(pano) {
+    if (pano === panoDown1) return 'down1';
+    if (pano === panoDown2) return 'down2';
+    if (pano === panoUp) return 'up';
+    if (pano === panoLaundry) return 'laundry';
+    return 'down1';
+  }
+
+  function setUrlForPanorama(pano) {
+    const key = panoramaKey(pano);
+    const url = new URL(window.location.href);
+    url.searchParams.set('pano', key);
+    window.history.replaceState({}, '', url);
+  }
+
+  function openCurrentFloorPlan() {
+    const file = floorPlanMap.get(currentPanorama);
+    if (file) window.open(file, '_blank');
+  }
+
+  function openCurrentMatterport() {
+    const link = matterportMap.get(currentPanorama);
+    if (link) window.open(link, '_blank');
+  }
+
+  function toggleHotspots() {
+    hotspotsVisible = !hotspotsVisible;
+    allHotspots.forEach(spot => {
+      if (spot.element) {
+        spot.element.style.display = hotspotsVisible ? 'block' : 'none';
+      }
+      if (spot.hoverElement) {
+        spot.hoverElement.style.display = 'none';
+      }
+    });
     closeMenu();
-  });
+  }
 
-  panoFrom.add(s);
-}
+  function degToRad(d) {
+    return d * Math.PI / 180;
+  }
 
-// ===== MENU =====
-function menu(panoFrom, items, yaw, pitch){
-  const s = new PANOLENS.Infospot(380, PANOLENS.DataImage.Arrow);
-  const p = pos(yaw, pitch);
-  s.position.set(p.x, p.y, p.z);
-
-  s.scale.x = -1; // flip ikony
-
-  // kolor + glow (żeby było widać na białym)
-  setTimeout(()=>{
-    const img = s.element?.querySelector('img');
-    if(img){
-      img.style.filter =
-        'drop-shadow(0 0 6px white) ' +
-        'drop-shadow(0 0 10px hotpink) ' +
-        'hue-rotate(300deg) saturate(3)';
-    }
-  }, 100);
-
-  s.addEventListener('click', (e)=>{
-    openMenu(items, e);
-  });
-
-  panoFrom.add(s);
-}
-
-// ===== PANEL MENU =====
-function openMenu(items, e){
-  const panel = document.getElementById('menuPanel');
-  panel.innerHTML = '';
-
-  items.forEach(i=>{
-    const b = document.createElement('button');
-    b.textContent = i.label;
-
-    b.onclick = ()=>{
-      viewer.setPanorama(i.target);
-      closeMenu();
+  function pos(yaw, pitch, r = 5000) {
+    const yR = degToRad(yaw);
+    const pR = degToRad(pitch);
+    return {
+      x: r * Math.sin(yR) * Math.cos(pR),
+      y: r * Math.sin(pR),
+      z: -r * Math.cos(yR) * Math.cos(pR)
     };
+  }
 
-    panel.appendChild(b);
+  function styleHotspotDark(spot) {
+    setTimeout(() => {
+      const img = spot.element?.querySelector('img');
+      if (img) {
+        img.style.filter =
+          'brightness(0.15) contrast(1.4) ' +
+          'drop-shadow(0 0 3px rgba(255,255,255,0.9))';
+      }
+    }, 120);
+  }
+
+  function styleHoverDark(spot) {
+    setTimeout(() => {
+      if (spot.hoverElement) {
+        spot.hoverElement.style.background = 'rgba(242,242,242,0.97)';
+        spot.hoverElement.style.color = '#333';
+        spot.hoverElement.style.borderRadius = '8px';
+        spot.hoverElement.style.padding = '6px 10px';
+        spot.hoverElement.style.boxShadow = '0 3px 10px rgba(0,0,0,0.18)';
+      }
+    }, 150);
+  }
+
+  function registerHotspot(spot) {
+    allHotspots.push(spot);
+    styleHotspotDark(spot);
+    styleHoverDark(spot);
+    return spot;
+  }
+
+  function spot(panoFrom, panoTo, label, yaw, pitch) {
+    const s = new PANOLENS.Infospot(350, PANOLENS.DataImage.Info);
+    const p = pos(yaw, pitch);
+    s.position.set(p.x, p.y, p.z);
+    s.addHoverText(label);
+
+    s.addEventListener('click', () => {
+      viewer.setPanorama(panoTo);
+      if (s.hoverElement) s.hoverElement.style.display = 'none';
+      closeMenu();
+    });
+
+    panoFrom.add(s);
+    return registerHotspot(s);
+  }
+
+  function menuSpot(panoFrom, items, yaw, pitch) {
+    const s = new PANOLENS.Infospot(380, PANOLENS.DataImage.Arrow);
+    const p = pos(yaw, pitch);
+    s.position.set(p.x, p.y, p.z);
+    s.scale.x = -1;
+    s.addHoverText('Menu');
+
+    s.addEventListener('click', (e) => {
+      if (s.hoverElement) s.hoverElement.style.display = 'none';
+      openPopupMenu(items, e);
+    });
+
+    panoFrom.add(s);
+    return registerHotspot(s);
+  }
+
+  function openPopupMenu(items, e) {
+    const panel = document.getElementById('menuPanel');
+    panel.innerHTML = '';
+
+    items.forEach(i => {
+      const b = document.createElement('button');
+      b.textContent = i.label;
+      b.onclick = () => {
+        if (i.type === 'panorama') viewer.setPanorama(i.target);
+        if (i.type === 'link') window.open(i.target, '_blank');
+        closeMenu();
+      };
+      panel.appendChild(b);
+    });
+
+    if (window.innerWidth <= 768) {
+      panel.style.left = '12px';
+      panel.style.right = '12px';
+      panel.style.bottom = '84px';
+      panel.style.top = 'auto';
+    } else {
+      let x = e?.mouseEvent?.clientX ?? (window.innerWidth - 290);
+      let y = e?.mouseEvent?.clientY ?? 120;
+
+      const panelWidth = 270;
+      const panelHeight = Math.max(180, items.length * 50 + 20);
+
+      if (x + panelWidth > window.innerWidth) x = window.innerWidth - panelWidth - 12;
+      if (y + panelHeight > window.innerHeight) y = window.innerHeight - panelHeight - 12;
+      if (x < 12) x = 12;
+      if (y < 12) y = 12;
+
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    }
+
+    panel.style.display = 'block';
+  }
+
+  function openHamburgerMenu() {
+    const panel = document.getElementById('menuPanel');
+    panel.innerHTML = '';
+
+    const items = [
+      {
+        label: 'Open floor plan of current room',
+        action: openCurrentFloorPlan
+      },
+      {
+        label: 'Open Matterport scan',
+        action: openCurrentMatterport
+      },
+      {
+        label: 'Credentials',
+        action: () => window.open('https://kemeis.github.io/Portfolio/', '_blank')
+      },
+      {
+        label: hotspotsVisible ? 'Hide hotspots' : 'Show hotspots',
+        action: toggleHotspots
+      },
+      {
+        label: 'Hamburger',
+        action: closeMenu
+      }
+    ];
+
+    items.forEach(i => {
+      const b = document.createElement('button');
+      b.textContent = i.label;
+      b.onclick = i.action;
+      panel.appendChild(b);
+    });
+
+    if (window.innerWidth <= 768) {
+      panel.style.left = '12px';
+      panel.style.right = '12px';
+      panel.style.bottom = '84px';
+      panel.style.top = 'auto';
+    } else {
+      panel.style.right = '16px';
+      panel.style.left = 'auto';
+      panel.style.bottom = '84px';
+      panel.style.top = 'auto';
+    }
+
+    panel.style.display = 'block';
+  }
+
+  function closeMenu() {
+    document.getElementById('menuPanel').style.display = 'none';
+  }
+
+  document.getElementById('hamburgerBtn').addEventListener('click', openHamburgerMenu);
+
+  // ===== HOTSPOTY =====
+  spot(panoDown1, panoDown2, 'Go there', 90, -45);
+  spot(panoDown2, panoDown1, 'Go there', 100, -45);
+
+  menuSpot(panoDown1, [
+    { label: 'Go to upstairs bathroom', target: panoUp, type: 'panorama' },
+    { label: 'Go to laundry room', target: panoLaundry, type: 'panorama' }
+  ], -2, 0);
+
+  menuSpot(panoDown2, [
+    { label: 'Go to upstairs bathroom', target: panoUp, type: 'panorama' },
+    { label: 'Go to laundry room', target: panoLaundry, type: 'panorama' }
+  ], 137, 0);
+
+  menuSpot(panoUp, [
+    { label: 'Go to downstairs bathroom', target: panoDown1, type: 'panorama' },
+    { label: 'Go to laundry room', target: panoLaundry, type: 'panorama' }
+  ], -118, 0);
+
+  menuSpot(panoLaundry, [
+    { label: 'Go to upstairs bathroom', target: panoUp, type: 'panorama' },
+    { label: 'Go to downstairs bathroom', target: panoDown1, type: 'panorama' }
+  ], -128, 0);
+
+  // ===== PANORAMA TRACKING =====
+  [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
+    pano.addEventListener('enter-fade-start', () => {
+      currentPanorama = pano;
+      setUrlForPanorama(pano);
+      closeMenu();
+      console.log('Current panorama:', panoramaName(pano));
+    });
   });
 
-  // pojawia się przy kliknięciu
-  panel.style.left = (e.mouseEvent.clientX + 10) + 'px';
-  panel.style.top = (e.mouseEvent.clientY + 10) + 'px';
-  panel.style.display = 'block';
-}
+  // ===== DEBUG =====
+  function xyzToYawPitch(x, y, z) {
+    const radius = Math.sqrt(x*x + y*y + z*z);
+    const yaw = Math.atan2(x, -z) * 180 / Math.PI;
+    const pitch = Math.asin(y / radius) * 180 / Math.PI;
+    return {
+      yaw: Math.round(yaw),
+      pitch: Math.round(pitch)
+    };
+  }
 
-function closeMenu(){
-  document.getElementById('menuPanel').style.display = 'none';
-}
+  [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
+    pano.addEventListener('click', function(event) {
+      if (!event.intersects || !event.intersects.length) return;
 
-// ===== HOTSPOTY =====
+      const point = event.intersects[0].point;
+      const x = Math.round(point.x);
+      const y = Math.round(point.y);
+      const z = Math.round(point.z);
+      const ang = xyzToYawPitch(point.x, point.y, point.z);
 
-// test -> cc
-spot(panoDown1, panoDown2, 'Go there', 90, -45);
+      console.log('----------------------------------');
+      console.log('Panorama:', panoramaName(pano));
+      console.log(`XYZ: ${x}, ${y}, ${z}`);
+      console.log(`Yaw/Pitch: ${ang.yaw}°, ${ang.pitch}°`);
+      console.log(`spot.position.set(${x}, ${y}, ${z});`);
+      console.log(`// or use angles: yaw ${ang.yaw}, pitch ${ang.pitch}`);
+      console.log('----------------------------------');
+    });
+  });
 
-// cc -> test
-spot(panoDown2, panoDown1, 'Go there', 100, -45);
+  // ===== START Z LINKU =====
+  const params = new URLSearchParams(window.location.search);
+  const startKey = params.get('pano');
+  const startPano = panoKeys[startKey] || panoDown1;
+  viewer.setPanorama(startPano);
+  currentPanorama = startPano;
+  setUrlForPanorama(startPano);
 
-// menu downstairs
-menu(panoDown1, [
-  {label:'Go to upstairs bathroom', target:panoUp},
-  {label:'Go to laundry room', target:panoLaundry}
-], -2, 0);
-
-menu(panoDown2, [
-  {label:'Go to upstairs bathroom', target:panoUp},
-  {label:'Go to laundry room', target:panoLaundry}
-], 137, 0);
-
-// upstairs
-menu(panoUp, [
-  {label:'Go to downstairs bathroom', target:panoDown1},
-  {label:'Go to laundry room', target:panoLaundry}
-], -118, 0);
-
-// laundry
-menu(panoLaundry, [
-  {label:'Go to upstairs bathroom', target:panoUp},
-  {label:'Go to downstairs bathroom', target:panoDown1}
-], -128, 0);
-
+  // expose for console
+  window.viewer = viewer;
+  window.closeMenu = closeMenu;
+  window.openHamburgerMenu = openHamburgerMenu;
 </script>
 
 </body>
