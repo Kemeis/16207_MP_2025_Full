@@ -129,8 +129,6 @@
   viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
 
   let currentPanorama = panoDown1;
-  let hotspotsVisible = true;
-  const allHotspots = [];
 
   const floorPlanMap = new Map([
     [panoDown1, '16207_MP_2025_VASKE_A3V18.pdf'],
@@ -179,25 +177,6 @@
     if (link) window.open(link, '_blank');
   }
 
-  function toggleHotspots() {
-    hotspotsVisible = !hotspotsVisible;
-
-    allHotspots.forEach(spot => {
-      spot.visible = hotspotsVisible;
-
-      if (spot.element) {
-        spot.element.style.display = hotspotsVisible ? '' : 'none';
-        spot.element.style.pointerEvents = hotspotsVisible ? 'auto' : 'none';
-      }
-
-      if (spot.hoverElement) {
-        spot.hoverElement.style.display = 'none';
-      }
-    });
-
-    closeMenu();
-  }
-
   function degToRad(d) {
     return d * Math.PI / 180;
   }
@@ -212,50 +191,28 @@
     };
   }
 
-  function registerHotspot(spot) {
-    allHotspots.push(spot);
-
+  function styleSpot(spot) {
     setTimeout(() => {
-      if (!hotspotsVisible) {
-        spot.visible = false;
-        if (spot.element) {
-          spot.element.style.display = 'none';
-          spot.element.style.pointerEvents = 'none';
-        }
-      }
-
       const img = spot.element?.querySelector('img');
       if (img) {
         img.style.filter =
           'brightness(0.18) contrast(1.4) drop-shadow(0 0 3px rgba(255,255,255,0.9))';
       }
-
-      if (spot.hoverElement) {
-        spot.hoverElement.style.background = 'rgba(242,242,242,0.97)';
-        spot.hoverElement.style.color = '#333';
-        spot.hoverElement.style.borderRadius = '8px';
-        spot.hoverElement.style.padding = '6px 10px';
-        spot.hoverElement.style.boxShadow = '0 3px 10px rgba(0,0,0,0.18)';
-      }
     }, 120);
-
-    return spot;
   }
 
-  function spot(panoFrom, panoTo, label, yaw, pitch) {
+  function spot(panoFrom, panoTo, yaw, pitch) {
     const s = new PANOLENS.Infospot(350, 'arrow.png');
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
-    s.addHoverText(label);
 
     s.addEventListener('click', () => {
       viewer.setPanorama(panoTo);
-      if (s.hoverElement) s.hoverElement.style.display = 'none';
       closeMenu();
     });
 
     panoFrom.add(s);
-    return registerHotspot(s);
+    styleSpot(s);
   }
 
   function menuSpot(panoFrom, items, yaw, pitch) {
@@ -264,15 +221,13 @@
     s.position.set(p.x, p.y, p.z);
 
     s.scale.x = -1;
-    s.addHoverText('Menu');
 
     s.addEventListener('click', (e) => {
-      if (s.hoverElement) s.hoverElement.style.display = 'none';
       openPopupMenu(items, e);
     });
 
     panoFrom.add(s);
-    return registerHotspot(s);
+    styleSpot(s);
   }
 
   function openPopupMenu(items, e) {
@@ -338,10 +293,6 @@
       {
         label: 'Credentials',
         action: () => window.open('https://kemeis.github.io/Portfolio/', '_blank')
-      },
-      {
-        label: hotspotsVisible ? 'Hide hotspots' : 'Show hotspots',
-        action: toggleHotspots
       }
     ];
 
@@ -376,22 +327,9 @@
     openHamburgerMenu();
   });
 
-  document.addEventListener('click', (e) => {
-    const panel = document.getElementById('menuPanel');
-    const hamburger = document.getElementById('hamburgerBtn');
-
-    if (
-      panel.style.display === 'block' &&
-      !panel.contains(e.target) &&
-      !hamburger.contains(e.target)
-    ) {
-      closeMenu();
-    }
-  });
-
-  // ===== HOTSPOTY =====
-  spot(panoDown1, panoDown2, 'Go there', 90, -45);
-  spot(panoDown2, panoDown1, 'Go there', 100, -45);
+  // ===== HOTSPOTS =====
+  spot(panoDown1, panoDown2, 90, -45);
+  spot(panoDown2, panoDown1, 100, -45);
 
   menuSpot(panoDown1, [
     { label: 'Go to upstairs bathroom', target: panoUp, type: 'panorama' },
@@ -413,29 +351,17 @@
     { label: 'Go to downstairs bathroom', target: panoDown1, type: 'panorama' }
   ], -128, 0);
 
-  // ===== PILNOWANIE STANU PO ZMIANIE PANORAMY =====
+  // ===== TRACK CURRENT PANORAMA =====
   [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
     pano.addEventListener('enter-fade-start', () => {
       currentPanorama = pano;
       setUrlForPanorama(pano);
       closeMenu();
-
-      allHotspots.forEach(spot => {
-        spot.visible = hotspotsVisible;
-        if (spot.element) {
-          spot.element.style.display = hotspotsVisible ? '' : 'none';
-          spot.element.style.pointerEvents = hotspotsVisible ? 'auto' : 'none';
-        }
-        if (spot.hoverElement) {
-          spot.hoverElement.style.display = 'none';
-        }
-      });
-
       console.log('Current panorama:', panoramaName(pano));
     });
   });
 
-  // ===== DEBUG KLIKANIA =====
+  // ===== DEBUG =====
   function xyzToYawPitch(x, y, z) {
     const radius = Math.sqrt(x*x + y*y + z*z);
     const yaw = Math.atan2(x, -z) * 180 / Math.PI;
