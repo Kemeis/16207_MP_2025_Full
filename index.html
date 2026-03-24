@@ -71,21 +71,6 @@
       background: rgba(242, 242, 242, 0.96);
     }
 
-    .debug-box {
-      position: absolute;
-      left: 16px;
-      top: 16px;
-      z-index: 35;
-      background: rgba(0,0,0,0.65);
-      color: white;
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      line-height: 1.35;
-      max-width: 320px;
-      display: none;
-    }
-
     @media (max-width: 768px) {
       .menu-panel {
         right: 12px !important;
@@ -116,10 +101,6 @@
 
 <div class="hamburger-wrap">
   <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu">☰</button>
-</div>
-
-<div class="debug-box" id="debugBox">
-  Debug mode enabled. Click panorama and check Console (F12).
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.105.2/build/three.min.js"></script>
@@ -200,14 +181,20 @@
 
   function toggleHotspots() {
     hotspotsVisible = !hotspotsVisible;
+
     allHotspots.forEach(spot => {
+      spot.visible = hotspotsVisible;
+
       if (spot.element) {
-        spot.element.style.display = hotspotsVisible ? 'block' : 'none';
+        spot.element.style.display = hotspotsVisible ? '' : 'none';
+        spot.element.style.pointerEvents = hotspotsVisible ? 'auto' : 'none';
       }
+
       if (spot.hoverElement) {
         spot.hoverElement.style.display = 'none';
       }
     });
+
     closeMenu();
   }
 
@@ -225,19 +212,24 @@
     };
   }
 
-  function styleHotspotDark(spot) {
+  function registerHotspot(spot) {
+    allHotspots.push(spot);
+
     setTimeout(() => {
+      if (!hotspotsVisible) {
+        spot.visible = false;
+        if (spot.element) {
+          spot.element.style.display = 'none';
+          spot.element.style.pointerEvents = 'none';
+        }
+      }
+
       const img = spot.element?.querySelector('img');
       if (img) {
         img.style.filter =
-          'brightness(0.15) contrast(1.4) ' +
-          'drop-shadow(0 0 3px rgba(255,255,255,0.9))';
+          'brightness(0.18) contrast(1.4) drop-shadow(0 0 3px rgba(255,255,255,0.9))';
       }
-    }, 120);
-  }
 
-  function styleHoverDark(spot) {
-    setTimeout(() => {
       if (spot.hoverElement) {
         spot.hoverElement.style.background = 'rgba(242,242,242,0.97)';
         spot.hoverElement.style.color = '#333';
@@ -245,18 +237,13 @@
         spot.hoverElement.style.padding = '6px 10px';
         spot.hoverElement.style.boxShadow = '0 3px 10px rgba(0,0,0,0.18)';
       }
-    }, 150);
-  }
+    }, 120);
 
-  function registerHotspot(spot) {
-    allHotspots.push(spot);
-    styleHotspotDark(spot);
-    styleHoverDark(spot);
     return spot;
   }
 
   function spot(panoFrom, panoTo, label, yaw, pitch) {
-    const s = new PANOLENS.Infospot(350, PANOLENS.DataImage.Info);
+    const s = new PANOLENS.Infospot(350, 'arrow.png');
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
     s.addHoverText(label);
@@ -272,9 +259,10 @@
   }
 
   function menuSpot(panoFrom, items, yaw, pitch) {
-    const s = new PANOLENS.Infospot(380, PANOLENS.DataImage.Arrow);
+    const s = new PANOLENS.Infospot(380, 'arrow.png');
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
+
     s.scale.x = -1;
     s.addHoverText('Menu');
 
@@ -330,6 +318,12 @@
 
   function openHamburgerMenu() {
     const panel = document.getElementById('menuPanel');
+
+    if (panel.style.display === 'block') {
+      closeMenu();
+      return;
+    }
+
     panel.innerHTML = '';
 
     const items = [
@@ -348,10 +342,6 @@
       {
         label: hotspotsVisible ? 'Hide hotspots' : 'Show hotspots',
         action: toggleHotspots
-      },
-      {
-        label: 'Hamburger',
-        action: closeMenu
       }
     ];
 
@@ -381,7 +371,23 @@
     document.getElementById('menuPanel').style.display = 'none';
   }
 
-  document.getElementById('hamburgerBtn').addEventListener('click', openHamburgerMenu);
+  document.getElementById('hamburgerBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openHamburgerMenu();
+  });
+
+  document.addEventListener('click', (e) => {
+    const panel = document.getElementById('menuPanel');
+    const hamburger = document.getElementById('hamburgerBtn');
+
+    if (
+      panel.style.display === 'block' &&
+      !panel.contains(e.target) &&
+      !hamburger.contains(e.target)
+    ) {
+      closeMenu();
+    }
+  });
 
   // ===== HOTSPOTY =====
   spot(panoDown1, panoDown2, 'Go there', 90, -45);
@@ -407,17 +413,29 @@
     { label: 'Go to downstairs bathroom', target: panoDown1, type: 'panorama' }
   ], -128, 0);
 
-  // ===== PANORAMA TRACKING =====
+  // ===== PILNOWANIE STANU PO ZMIANIE PANORAMY =====
   [panoDown1, panoDown2, panoUp, panoLaundry].forEach(pano => {
     pano.addEventListener('enter-fade-start', () => {
       currentPanorama = pano;
       setUrlForPanorama(pano);
       closeMenu();
+
+      allHotspots.forEach(spot => {
+        spot.visible = hotspotsVisible;
+        if (spot.element) {
+          spot.element.style.display = hotspotsVisible ? '' : 'none';
+          spot.element.style.pointerEvents = hotspotsVisible ? 'auto' : 'none';
+        }
+        if (spot.hoverElement) {
+          spot.hoverElement.style.display = 'none';
+        }
+      });
+
       console.log('Current panorama:', panoramaName(pano));
     });
   });
 
-  // ===== DEBUG =====
+  // ===== DEBUG KLIKANIA =====
   function xyzToYawPitch(x, y, z) {
     const radius = Math.sqrt(x*x + y*y + z*z);
     const yaw = Math.atan2(x, -z) * 180 / Math.PI;
@@ -456,10 +474,7 @@
   currentPanorama = startPano;
   setUrlForPanorama(startPano);
 
-  // expose for console
   window.viewer = viewer;
-  window.closeMenu = closeMenu;
-  window.openHamburgerMenu = openHamburgerMenu;
 </script>
 
 </body>
