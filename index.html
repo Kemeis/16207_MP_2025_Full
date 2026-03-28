@@ -159,8 +159,6 @@
 
   let currentPanorama = panoDown1;
   let currentMenuSpot = null;
-  const allSpots = [];
-
   const cursorLoader = document.getElementById('cursorLoader');
 
   const floorPlanMap = new Map([
@@ -251,11 +249,11 @@
     };
   }
 
-  function refreshSpotVisual(spot) {
+  function styleSpot(spot) {
     setTimeout(() => {
       const img = spot.element?.querySelector('img');
       if (img) {
-        img.style.filter = 'none';
+        img.style.filter = 'brightness(0) invert(1)';
         img.style.opacity = '1';
         img.style.display = 'block';
         img.style.visibility = 'visible';
@@ -266,15 +264,11 @@
         spot.element.style.visibility = 'visible';
         spot.element.style.opacity = '1';
       }
-    }, 80);
-  }
-
-  function refreshAllSpots() {
-    allSpots.forEach(spot => refreshSpotVisual(spot));
+    }, 120);
   }
 
   function spot(panoFrom, panoTo, yaw, pitch) {
-    const s = new PANOLENS.Infospot(350, 'arrow.svg');
+    const s = new PANOLENS.Infospot(350, PANOLENS.DataImage.Arrow);
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
 
@@ -283,12 +277,11 @@
     });
 
     panoFrom.add(s);
-    allSpots.push(s);
-    refreshSpotVisual(s);
+    styleSpot(s);
   }
 
   function menuSpot(panoFrom, items, yaw, pitch) {
-    const s = new PANOLENS.Infospot(380, 'arrow.svg');
+    const s = new PANOLENS.Infospot(380, PANOLENS.DataImage.Arrow);
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
     s.scale.x = -1;
@@ -299,8 +292,7 @@
     });
 
     panoFrom.add(s);
-    allSpots.push(s);
-    refreshSpotVisual(s);
+    styleSpot(s);
   }
 
   function openPopupMenu(items, e) {
@@ -430,12 +422,15 @@
       currentPanorama = pano;
       setUrlForPanorama(pano);
       closeMenu();
-      refreshAllSpots();
       console.log('Current panorama:', panoramaName(pano));
 
       setTimeout(() => {
-        refreshAllSpots();
         hideCursorLoader();
+        document.querySelectorAll('.panolens-infospot').forEach(el => {
+          el.style.display = 'block';
+          el.style.visibility = 'visible';
+          el.style.opacity = '1';
+        });
       }, 250);
     });
   });
@@ -480,7 +475,6 @@
   viewer.setPanorama(startPano);
   currentPanorama = startPano;
   setUrlForPanorama(startPano);
-  refreshAllSpots();
 
   window.viewer = viewer;
 </script>
