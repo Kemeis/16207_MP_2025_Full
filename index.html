@@ -61,9 +61,6 @@
       right: 16px;
       bottom: 16px;
       z-index: 35;
-      display: flex;
-      align-items: center;
-      gap: 10px;
     }
 
     .hamburger-btn {
@@ -72,7 +69,6 @@
       font-size: 24px;
       box-shadow: 0 4px 14px rgba(0,0,0,0.28);
       background: rgba(242, 242, 242, 0.96);
-      flex-shrink: 0;
     }
 
     .cursor-loader {
@@ -162,6 +158,9 @@
   viewer.add(panoDown1, panoDown2, panoUp, panoLaundry);
 
   let currentPanorama = panoDown1;
+  let currentMenuSpot = null;
+  const allSpots = [];
+
   const cursorLoader = document.getElementById('cursorLoader');
 
   const floorPlanMap = new Map([
@@ -178,8 +177,19 @@
     [panoUp, 'https://my.matterport.com/show/?m=jFZUjuYMpY9&ss=12&sr=-.6,.45']
   ]);
 
-  function showCursorLoader(x, y) {
-    cursorLoader.style.left = (x - 13) + 'px';
+  function showLoaderNextToSpot(spot) {
+    if (!spot || !spot.element) {
+      cursorLoader.style.left = (window.innerWidth / 2 - 13) + 'px';
+      cursorLoader.style.top = (window.innerHeight / 2 - 13) + 'px';
+      cursorLoader.classList.add('visible');
+      return;
+    }
+
+    const rect = spot.element.getBoundingClientRect();
+    const x = rect.right + 10;
+    const y = rect.top + rect.height / 2;
+
+    cursorLoader.style.left = x + 'px';
     cursorLoader.style.top = (y - 13) + 'px';
     cursorLoader.classList.add('visible');
   }
@@ -188,16 +198,8 @@
     cursorLoader.classList.remove('visible');
   }
 
-  function changePanorama(targetPano, event) {
-    if (event && event.mouseEvent) {
-      showCursorLoader(
-        event.mouseEvent.clientX,
-        event.mouseEvent.clientY
-      );
-    } else {
-      showCursorLoader(window.innerWidth / 2, window.innerHeight / 2);
-    }
-
+  function changePanorama(targetPano, spot) {
+    showLoaderNextToSpot(spot);
     closeMenu();
     viewer.setPanorama(targetPano);
   }
@@ -249,41 +251,56 @@
     };
   }
 
-  function styleSpot(spot) {
+  function refreshSpotVisual(spot) {
     setTimeout(() => {
       const img = spot.element?.querySelector('img');
       if (img) {
-        img.style.filter =
-          'brightness(0.18) contrast(1.4) drop-shadow(0 0 3px rgba(255,255,255,0.9))';
+        img.style.filter = 'none';
+        img.style.opacity = '1';
+        img.style.display = 'block';
+        img.style.visibility = 'visible';
       }
-    }, 120);
+
+      if (spot.element) {
+        spot.element.style.display = 'block';
+        spot.element.style.visibility = 'visible';
+        spot.element.style.opacity = '1';
+      }
+    }, 80);
+  }
+
+  function refreshAllSpots() {
+    allSpots.forEach(spot => refreshSpotVisual(spot));
   }
 
   function spot(panoFrom, panoTo, yaw, pitch) {
-    const s = new PANOLENS.Infospot(350, 'arrow.png');
+    const s = new PANOLENS.Infospot(350, 'arrow.svg');
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
 
-    s.addEventListener('click', (e) => {
-      changePanorama(panoTo, e);
+    s.addEventListener('click', () => {
+      changePanorama(panoTo, s);
     });
 
     panoFrom.add(s);
-    styleSpot(s);
+    allSpots.push(s);
+    refreshSpotVisual(s);
   }
 
   function menuSpot(panoFrom, items, yaw, pitch) {
-    const s = new PANOLENS.Infospot(380, 'arrow.png');
+    const s = new PANOLENS.Infospot(380, 'arrow.svg');
     const p = pos(yaw, pitch);
     s.position.set(p.x, p.y, p.z);
     s.scale.x = -1;
 
     s.addEventListener('click', (e) => {
+      currentMenuSpot = s;
       openPopupMenu(items, e);
     });
 
     panoFrom.add(s);
-    styleSpot(s);
+    allSpots.push(s);
+    refreshSpotVisual(s);
   }
 
   function openPopupMenu(items, e) {
@@ -294,7 +311,7 @@
       const b = document.createElement('button');
       b.textContent = i.label;
       b.onclick = () => {
-        if (i.type === 'panorama') changePanorama(i.target);
+        if (i.type === 'panorama') changePanorama(i.target, currentMenuSpot);
         if (i.type === 'link') window.open(i.target, '_blank');
         closeMenu();
       };
@@ -413,9 +430,11 @@
       currentPanorama = pano;
       setUrlForPanorama(pano);
       closeMenu();
+      refreshAllSpots();
       console.log('Current panorama:', panoramaName(pano));
 
       setTimeout(() => {
+        refreshAllSpots();
         hideCursorLoader();
       }, 250);
     });
@@ -457,10 +476,11 @@
   const startKey = params.get('pano');
   const startPano = panoKeys[startKey] || panoDown1;
 
-  showCursorLoader(window.innerWidth / 2, window.innerHeight / 2);
+  showLoaderNextToSpot(null);
   viewer.setPanorama(startPano);
   currentPanorama = startPano;
   setUrlForPanorama(startPano);
+  refreshAllSpots();
 
   window.viewer = viewer;
 </script>
